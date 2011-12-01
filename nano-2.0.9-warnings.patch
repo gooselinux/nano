@@ -1,0 +1,177 @@
+diff -rup nano-2.0.9.orig/src/chars.c nano-2.0.9/src/chars.c
+--- nano-2.0.9.orig/src/chars.c	2008-04-02 05:49:33.000000000 +0200
++++ nano-2.0.9/src/chars.c	2009-09-21 13:22:25.976235192 +0200
+@@ -79,6 +79,18 @@ bool is_byte(int c)
+     return ((unsigned int)c == (unsigned char)c);
+ }
+ 
++static void mbtowc_reset(void)
++{
++    int rv = mbtowc(NULL, NULL, 0);
++    (void) rv;
++}
++
++static void wctomb_reset(void)
++{
++    int rv = wctomb(NULL, 0);
++    (void) rv;
++}
++
+ /* This function is equivalent to isalnum() for multibyte characters. */
+ bool is_alnum_mbchar(const char *c)
+ {
+@@ -89,7 +101,7 @@ bool is_alnum_mbchar(const char *c)
+ 	wchar_t wc;
+ 
+ 	if (mbtowc(&wc, c, MB_CUR_MAX) < 0) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    wc = bad_wchar;
+ 	}
+ 
+@@ -109,7 +121,7 @@ bool is_blank_mbchar(const char *c)
+ 	wchar_t wc;
+ 
+ 	if (mbtowc(&wc, c, MB_CUR_MAX) < 0) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    wc = bad_wchar;
+ 	}
+ 
+@@ -156,7 +168,7 @@ bool is_cntrl_mbchar(const char *c)
+ 	wchar_t wc;
+ 
+ 	if (mbtowc(&wc, c, MB_CUR_MAX) < 0) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    wc = bad_wchar;
+ 	}
+ 
+@@ -177,7 +189,7 @@ bool is_punct_mbchar(const char *c)
+ 	int c_mb_len = mbtowc(&wc, c, MB_CUR_MAX);
+ 
+ 	if (c_mb_len < 0) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    wc = bad_wchar;
+ 	}
+ 
+@@ -243,14 +255,14 @@ char *control_mbrep(const char *c, char 
+ 	wchar_t wc;
+ 
+ 	if (mbtowc(&wc, c, MB_CUR_MAX) < 0) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    *crep_len = bad_mbchar_len;
+ 	    strncpy(crep, bad_mbchar, *crep_len);
+ 	} else {
+ 	    *crep_len = wctomb(crep, control_wrep(wc));
+ 
+ 	    if (*crep_len < 0) {
+-		wctomb(NULL, 0);
++		wctomb_reset();
+ 		*crep_len = 0;
+ 	    }
+ 	}
+@@ -278,14 +290,14 @@ char *mbrep(const char *c, char *crep, i
+ 
+ 	/* Reject invalid Unicode characters. */
+ 	if (mbtowc(&wc, c, MB_CUR_MAX) < 0 || !is_valid_unicode(wc)) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    *crep_len = bad_mbchar_len;
+ 	    strncpy(crep, bad_mbchar, *crep_len);
+ 	} else {
+ 	    *crep_len = wctomb(crep, wc);
+ 
+ 	    if (*crep_len < 0) {
+-		wctomb(NULL, 0);
++		wctomb_reset();
+ 		*crep_len = 0;
+ 	    }
+ 	}
+@@ -311,7 +323,7 @@ int mbwidth(const char *c)
+ 	int width;
+ 
+ 	if (mbtowc(&wc, c, MB_CUR_MAX) < 0) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    wc = bad_wchar;
+ 	}
+ 
+@@ -356,7 +368,7 @@ char *make_mbchar(long chr, int *chr_mb_
+ 
+ 	/* Reject invalid Unicode characters. */
+ 	if (*chr_mb_len < 0 || !is_valid_unicode((wchar_t)chr)) {
+-	    wctomb(NULL, 0);
++	    wctomb_reset();
+ 	    *chr_mb_len = 0;
+ 	}
+     } else {
+@@ -388,7 +400,8 @@ int parse_mbchar(const char *buf, char *
+ 	/* If buf contains an invalid multibyte character, only
+ 	 * interpret buf's first byte. */
+ 	if (buf_mb_len < 0) {
+-	    mblen(NULL, 0);
++	    int rv = mblen(NULL, 0);
++	    (void) rv;
+ 	    buf_mb_len = 1;
+ 	} else if (buf_mb_len == 0)
+ 	    buf_mb_len++;
+@@ -545,7 +558,7 @@ int mbstrncasecmp(const char *s1, const 
+ 	    s1_mb_len = parse_mbchar(s1, s1_mb, NULL);
+ 
+ 	    if (mbtowc(&ws1, s1_mb, s1_mb_len) < 0) {
+-		mbtowc(NULL, NULL, 0);
++		mbtowc_reset();
+ 		ws1 = (unsigned char)*s1_mb;
+ 		bad_s1_mb = TRUE;
+ 	    }
+@@ -553,7 +566,7 @@ int mbstrncasecmp(const char *s1, const 
+ 	    s2_mb_len = parse_mbchar(s2, s2_mb, NULL);
+ 
+ 	    if (mbtowc(&ws2, s2_mb, s2_mb_len) < 0) {
+-		mbtowc(NULL, NULL, 0);
++		mbtowc_reset();
+ 		ws2 = (unsigned char)*s2_mb;
+ 		bad_s2_mb = TRUE;
+ 	    }
+@@ -781,7 +794,7 @@ char *mbstrchr(const char *s, const char
+ 	int c_mb_len = mbtowc(&wc, c, MB_CUR_MAX);
+ 
+ 	if (c_mb_len < 0) {
+-	    mbtowc(NULL, NULL, 0);
++	    mbtowc_reset();
+ 	    wc = (unsigned char)*c;
+ 	    bad_c_mb = TRUE;
+ 	}
+@@ -790,7 +803,7 @@ char *mbstrchr(const char *s, const char
+ 	    int s_mb_len = parse_mbchar(s, s_mb, NULL);
+ 
+ 	    if (mbtowc(&ws, s_mb, s_mb_len) < 0) {
+-		mbtowc(NULL, NULL, 0);
++		mbtowc_reset();
+ 		ws = (unsigned char)*s;
+ 		bad_s_mb = TRUE;
+ 	    }
+diff -rup nano-2.0.9.orig/src/files.c nano-2.0.9/src/files.c
+--- nano-2.0.9.orig/src/files.c	2008-08-24 07:49:25.000000000 +0200
++++ nano-2.0.9/src/files.c	2009-09-21 13:24:50.585047697 +0200
+@@ -1057,6 +1057,7 @@ char *get_full_path(const char *origpath
+ 	    free(d_there);
+ 	    d_there = NULL;
+ 	} else {
++	    int rv;
+ 	    free(d_there);
+ 
+ 	    /* Get the full path. */
+@@ -1082,7 +1083,8 @@ char *get_full_path(const char *origpath
+ 	    /* Finally, go back to the path specified in d_here,
+ 	     * where we were before.  We don't check for a chdir()
+ 	     * error, since we can do nothing if we get one. */
+-	    chdir(d_here);
++	    rv = chdir(d_here);
++	    (void) rv;
+ 
+ 	    /* Free d_here, since we're done using it. */
+ 	    free(d_here);

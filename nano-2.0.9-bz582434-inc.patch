@@ -1,0 +1,68 @@
+diff --git a/src/files.c b/src/files.c
+index 408dba8..2e87856 100644
+--- a/src/files.c
++++ b/src/files.c
+@@ -1394,14 +1394,21 @@ bool write_file(const char *name, FILE *f_open, bool tmp, append_type
+     realexists = (stat(realname, &st) != -1);
+ 
+ #ifndef NANO_TINY
++    /* if we have not stat()d this file before (say, the user just
++     * specified it interactively), stat and save the value
++     * or else we will chase null pointers when we do
++     * modtime checks, preserve file times, etc. during backup */
++    if (openfile->current_stat == NULL && !tmp && realexists)
++	stat(realname, openfile->current_stat);
++
+     /* We backup only if the backup toggle is set, the file isn't
+      * temporary, and the file already exists.  Furthermore, if we
+      * aren't appending, prepending, or writing a selection, we backup
+      * only if the file has not been modified by someone else since nano
+      * opened it. */
+     if (ISSET(BACKUP_FILE) && !tmp && realexists && ((append !=
+-	OVERWRITE || openfile->mark_set) ||
+-	openfile->current_stat->st_mtime == st.st_mtime)) {
++	OVERWRITE || openfile->mark_set) || (openfile->current_stat &&
++	openfile->current_stat->st_mtime == st.st_mtime))) {
+ 	int backup_fd;
+ 	FILE *backup_file;
+ 	char *backupname;
+@@ -1458,14 +1465,15 @@ bool write_file(const char *name, FILE *f_open, bool tmp, append_type
+ 	    free(backuptemp);
+ 	    backuptemp = get_next_filename(backupname, "~");
+ 	    if (*backuptemp == '\0') {
+-		statusbar(_("Error writing %s: %s"), backupname,
++		statusbar(_("Error writing backup file %s: %s"), backupname,
+ 		    _("Too many backup files?"));
+ 		free(backuptemp);
+ 		free(backupname);
+-		/* If we can't write to the backup, go on, since only
+-		 * saving the original file is better than saving
+-		 * nothing. */
+-		goto skip_backup;
++		/* If we can't write to the backup, DONT go on, since
++		   whatever caused the backup file to fail (e.g. disk
++		   full may well cause the real file write to fail, which
++		   means we could lose both the backup and the original! */
++		goto cleanup_and_exit;
+ 	    } else {
+ 		free(backupname);
+ 		backupname = backuptemp;
+@@ -2022,6 +2030,18 @@ bool do_writeout(bool exiting)
+ 			    continue;
+ 		    }
+ 		}
++#ifndef NANO_TINY
++		/* Complain if the file exists, the name hasn't changed, and the
++		    stat information we had before does not match what we have now */
++		else if (name_exists && openfile->current_stat && (openfile->current_stat->st_mtime < st.st_mtime ||
++                    openfile->current_stat->st_dev != st.st_dev || openfile->current_stat->st_ino != st.st_ino)) {
++		    i = do_yesno_prompt(FALSE,
++			_("File was modified since you opened it, continue saving ? "));
++		    if (i == 0 || i == -1)
++			continue;
++		}
++#endif
++
+ 	    }
+ 
+ 	    /* Convert newlines to nulls, just before we save the
